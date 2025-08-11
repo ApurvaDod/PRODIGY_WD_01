@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Weather App</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: url('https://source.unsplash.com/1600x900/?sky') no-repeat center center fixed;
+      background-size: cover;
+      margin: 0;
+      padding: 0;
+      color: #fff;
+    }
+    .container {
+      max-width: 600px;
+      margin: 50px auto;
+      background-color: rgba(0, 0, 0, 0.6);
+      padding: 30px;
+      border-radius: 15px;
+      text-align: center;
+    }
+    input {
+      width: 70%;
+      padding: 10px;
+      border-radius: 5px;
+      border: none;
+      margin-bottom: 10px;
+    }
+    button {
+      padding: 10px 20px;
+      border: none;
+      border-radius: 5px;
+      background-color: #03a9f4;
+      color: white;
+      font-weight: bold;
+      cursor: pointer;
+    }
+    button:hover {
+      background-color: #0288d1;
+    }
+    #weather, #forecast {
+      margin-top: 20px;
+    }
+    .icon {
+      width: 80px;
+    }
+    .loader {
+      border: 8px solid #f3f3f3;
+      border-top: 8px solid #3498db;
+      border-radius: 50%;
+      width: 60px;
+      height: 60px;
+      animation: spin 1s linear infinite;
+      margin: 20px auto;
+    }
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    .forecast-day {
+      background: rgba(255, 255, 255, 0.1);
+      margin: 10px;
+      padding: 10px;
+      border-radius: 10px;
+      display: inline-block;
+      width: 120px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🌦️ WeatherSphere</h1>
+    <input type="text" id="locationInput" placeholder="Enter city name or use location" />
+    <br />
+    <button onclick="getWeather()">Search</button>
+    <button onclick="getWeatherByLocation()">Use My Location</button>
+    <div id="loader" class="loader" style="display: none;"></div>
+    <div id="weather"></div>
+    <div id="forecast"></div>
+  </div>
+
+  <script>
+    const apiKey = '10bd7bc44dd39ef6cf3755e028298b6a'; // Replace with your OpenWeatherMap API key
+
+    function showLoader(show) {
+      document.getElementById('loader').style.display = show ? 'block' : 'none';
+    }
+
+    async function getWeather() {
+      const location = document.getElementById('locationInput').value.trim();
+      if (!location) {
+        document.getElementById('weather').innerHTML = '<p>Please enter a city name.</p>';
+        return;
+      }
+      const url = `https://api.openweathermap.org/data/2.5/weather?q=${encodeURIComponent(location)}&units=metric&appid=${apiKey}`;
+      const forecastUrl = `https://api.openweathermap.org/data/2.5/forecast?q=${encodeURIComponent(location)}&units=metric&appid=${apiKey}`;
+      fetchWeatherData(url);
+      fetchForecastData(forecastUrl);
+    }
+
+    async function getWeatherByLocation() {
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(async position => {
+          const lat = position.coords.latitude;
+          const lon = position.coords.longitude;
+          const url = `https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lon}&units=metric&appid=${apiKey}`;
+          const forecastUrl = `https://api.openweathermap.org/data/2.5/forecast?lat=${lat}&lon=${lon}&units=metric&appid=${apiKey}`;
+          fetchWeatherData(url);
+          fetchForecastData(forecastUrl);
+        }, error => {
+          document.getElementById('weather').innerHTML = '<p>Location access denied or unavailable.</p>';
+        });
+      } else {
+        document.getElementById('weather').innerHTML = '<p>Geolocation is not supported by this browser.</p>';
+      }
+    }
+
+    async function fetchWeatherData(url) {
+      showLoader(true);
+      try {
+        const response = await fetch(url);
+        const data = await response.json();
+        if (data.cod === 200) {
+          document.body.style.backgroundImage = `url('https://source.unsplash.com/1600x900/?${data.weather[0].main},sky')`;
+          const weatherHTML = `
+            <h2>${data.name}, ${data.sys.country}</h2>
+            <img src="https://openweathermap.org/img/wn/${data.weather[0].icon}@2x.png" class="icon" alt="weather icon">
+            <p><strong>${data.weather[0].main}:</strong> ${data.weather[0].description}</p>
+            <p><strong>Temperature:</strong> ${data.main.temp} °C</p>
+            <p><strong>Humidity:</strong> ${data.main.humidity}%</p>
+            <p><strong>Wind:</strong> ${data.wind.speed} m/s</p>
+          `;
+          document.getElementById('weather').innerHTML = weatherHTML;
+        } else {
+          document.getElementById('weather').innerHTML = `<p>City not found. Try again.</p>`;
+        }
+      } catch (error) {
+        document.getElementById('weather').innerHTML = `<p>Error fetching data. Try again later.</p>`;
+      } finally {
+        showLoader(false);
+      }
+    }
+
+    async function fetchForecastData(url) {
+      try {
+        const response = await fetch(url);
+        const data = await response.json();
+
+        if (data.cod === "200") {
+          const forecastDiv = document.getElementById('forecast');
+          forecastDiv.innerHTML = '<h3>5-Day Forecast</h3>';
+          const days = {};
+
+          data.list.forEach(item => {
+            const date = item.dt_txt.split(' ')[0];
+            if (!days[date] && Object.keys(days).length < 5) {
+              days[date] = item;
+            }
+          });
+
+          for (let date in days) {
+            const f = days[date];
+            forecastDiv.innerHTML += `
+              <div class="forecast-day">
+                <p><strong>${new Date(date).toDateString()}</strong></p>
+                <img src="https://openweathermap.org/img/wn/${f.weather[0].icon}@2x.png" class="icon">
+                <p>${f.weather[0].main}</p>
+                <p>${f.main.temp} °C</p>
+              </div>
+            `;
+          }
+        }
+      } catch (error) {
+        document.getElementById('forecast').innerHTML = '<p>Error fetching forecast.</p>';
+      }
+    }
+  </script>
+</body>
+</html>
